@@ -28,6 +28,13 @@ export async function POST() {
     // Supabase에 사용자 정보 동기화
     const supabase = getServiceRoleClient();
 
+    // 기존 사용자 정보 조회 (role 유지하기 위함)
+    const { data: existingUser } = await supabase
+      .from("users")
+      .select("role")
+      .eq("clerk_id", clerkUser.id)
+      .single();
+
     const { data, error } = await supabase
       .from("users")
       .upsert(
@@ -38,10 +45,12 @@ export async function POST() {
             clerkUser.username ||
             clerkUser.emailAddresses[0]?.emailAddress ||
             "Unknown",
+          email: clerkUser.emailAddresses[0]?.emailAddress || null,
+          role: existingUser?.role || "buyer", // 기존 role 유지, 없으면 기본값 'buyer'
         },
         {
           onConflict: "clerk_id",
-        }
+        },
       )
       .select()
       .single();
@@ -50,7 +59,7 @@ export async function POST() {
       console.error("Supabase sync error:", error);
       return NextResponse.json(
         { error: "Failed to sync user", details: error.message },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -62,7 +71,7 @@ export async function POST() {
     console.error("Sync user error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
